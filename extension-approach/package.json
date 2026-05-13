@@ -4,7 +4,7 @@
   "repository": {"type": "git", "url": "https://github.com/akashdwivedi/copilot-mem-ext.git"},
   "displayName": "Copilot Mem",
   "description": "Persistent memory for GitHub Copilot inside VS Code",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -14,6 +14,51 @@
   "main": "./dist/extension.js",
   "activationEvents": ["*"],
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "copilot-mem-sidebar",
+          "title": "Copilot Mem",
+          "icon": "$(database)"
+        }
+      ]
+    },
+    "views": {
+      "copilot-mem-sidebar": [
+        {
+          "id": "copilot-mem-explorer",
+          "name": "Stored Memories"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "copilot-mem.refresh",
+        "title": "Refresh Memories",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "copilot-mem.delete",
+        "title": "Delete Memory",
+        "icon": "$(trash)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "copilot-mem.refresh",
+          "when": "view == copilot-mem-explorer",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "copilot-mem.delete",
+          "when": "view == copilot-mem-explorer",
+          "group": "inline"
+        }
+      ]
+    },
     "languageModelTools": [
       {
         "name": "copilot_mem_search",
