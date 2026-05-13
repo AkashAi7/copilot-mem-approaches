@@ -1,0 +1,61 @@
+{
+  "name": "copilot-mem-ext",
+  "publisher": "akashdwivedi",
+  "repository": {"type": "git", "url": "https://github.com/akashdwivedi/copilot-mem-ext.git"},
+  "displayName": "Copilot Mem",
+  "description": "Persistent memory for GitHub Copilot inside VS Code",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Machine Learning"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": ["*"],
+  "contributes": {
+    "languageModelTools": [
+      {
+        "name": "copilot_mem_search",
+        "tags": ["memory", "context", "history"],
+        "toolReferenceName": "memory",
+        "description": "Search the persistent memory store.",
+        "modelDescription": "Search the persistent memory store.",
+        "parametersSchema": {
+          "type": "object",
+          "properties": {
+            "query": { "type": "string" }
+          },
+          "required": ["query"]
+        }
+      },
+      {
+        "name": "copilot_mem_save",
+        "tags": ["memory", "remember"],
+        "toolReferenceName": "remember",
+        "description": "Save important context to memory.",
+        "modelDescription": "Save important context.",
+        "parametersSchema": {
+          "type": "object",
+          "properties": {
+            "content": { "type": "string" }
+          },
+          "required": ["content"]
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@types/node": "20.x",
+    "typescript": "^5.4.5",
+    "esbuild": "^0.21.5",
+    "@vscode/vsce": "^2.31.1"
+  }
+}
