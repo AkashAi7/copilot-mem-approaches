@@ -137,7 +137,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.commands.registerCommand("copilot-mem.enableAutoCapture", () => enableAutoCapture(hooksDir)));
     context.subscriptions.push(vscode.commands.registerCommand("copilot-mem.disableAutoCapture", () => disableAutoCapture(hooksDir)));
 
-    const searchTool = vscode.lm.registerTool("copilot_mem_search", {
+    const searchTool = vscode.lm.registerTool("mem_search", {
         async invoke(options, _token) {
             const data = JSON.parse(fs.readFileSync(memoryFile, "utf8"));
             const query = (options.parameters.query as string).toLowerCase();
@@ -153,7 +153,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    const saveTool = vscode.lm.registerTool("copilot_mem_save", {
+    const saveTool = vscode.lm.registerTool("mem_save", {
         async invoke(options, _token) {
             const data = JSON.parse(fs.readFileSync(memoryFile, "utf8"));
             const content = options.parameters.content as string;

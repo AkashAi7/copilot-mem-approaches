@@ -4,7 +4,7 @@
   "repository": {"type": "git", "url": "https://github.com/akashdwivedi/copilot-mem-ext.git"},
   "displayName": "Copilot Mem",
   "description": "Persistent memory for GitHub Copilot inside VS Code",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -69,7 +69,7 @@
     },
     "languageModelTools": [
       {
-        "name": "copilot_mem_search",
+        "name": "mem_search",
         "displayName": "Search Memory",
         "userDescription": "Search Copilot's persistent memory store.",
         "canBeReferencedInPrompt": true,
@@ -87,7 +87,7 @@
         }
       },
       {
-        "name": "copilot_mem_save",
+        "name": "mem_save",
         "displayName": "Save Memory",
         "userDescription": "Save context to Copilot's persistent memory.",
         "canBeReferencedInPrompt": true,
