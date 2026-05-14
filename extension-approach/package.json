@@ -4,7 +4,7 @@
   "repository": {"type": "git", "url": "https://github.com/akashdwivedi/copilot-mem-ext.git"},
   "displayName": "Copilot Mem",
   "description": "Persistent memory for GitHub Copilot inside VS Code",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -41,6 +41,14 @@
         "command": "copilot-mem.delete",
         "title": "Delete Memory",
         "icon": "$(trash)"
+      },
+      {
+        "command": "copilot-mem.enableAutoCapture",
+        "title": "Copilot Mem: Enable Auto-Capture (Hooks)"
+      },
+      {
+        "command": "copilot-mem.disableAutoCapture",
+        "title": "Copilot Mem: Disable Auto-Capture (Hooks)"
       }
     ],
     "menus": {
