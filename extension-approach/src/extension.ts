@@ -2,6 +2,56 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 
+type MemRecord = { text: string; ts: string; embedding?: number[] };
+
+function readMemFile(file: string): MemRecord[] {
+    if (!fs.existsSync(file)) return [];
+    let raw: any;
+    try { raw = JSON.parse(fs.readFileSync(file, "utf8")); } catch { return []; }
+    if (!Array.isArray(raw)) return [];
+    return raw.map((entry: any): MemRecord => {
+        if (typeof entry === "string") {
+            const m = entry.match(/^\[(.+?)\]\s*(.*)$/);
+            return m ? { ts: m[1], text: m[2] } : { ts: new Date().toISOString(), text: entry };
+        }
+        return { ts: entry.ts ?? new Date().toISOString(), text: String(entry.text ?? ""), embedding: entry.embedding };
+    });
+}
+
+function writeMemFile(file: string, data: MemRecord[]) {
+    fs.writeFileSync(file, JSON.stringify(data, null, 2));
+}
+
+function cosine(a: number[], b: number[]): number {
+    let dot = 0, na = 0, nb = 0;
+    const n = Math.min(a.length, b.length);
+    for (let i = 0; i < n; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+    if (na === 0 || nb === 0) return 0;
+    return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+let embedderPromise: Promise<any> | null = null;
+async function getEmbedder(): Promise<any> {
+    if (!embedderPromise) {
+        embedderPromise = (async () => {
+            const tx = await import("@huggingface/transformers");
+            return await tx.pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", { quantized: true } as any);
+        })().catch(err => { embedderPromise = null; throw err; });
+    }
+    return embedderPromise;
+}
+
+async function embed(text: string): Promise<number[] | undefined> {
+    try {
+        const pipe = await getEmbedder();
+        const out = await pipe(text, { pooling: "mean", normalize: true });
+        return Array.from(out.data as Float32Array);
+    } catch (e) {
+        console.error("Memory Lane embed failed", e);
+        return undefined;
+    }
+}
+
 class MemoryItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
@@ -28,19 +78,19 @@ class MemoryProvider implements vscode.TreeDataProvider<MemoryItem> {
     }
 
     getChildren(): Thenable<MemoryItem[]> {
-        if (!fs.existsSync(this.memoryFile)) return Promise.resolve([]);
-        const data = JSON.parse(fs.readFileSync(this.memoryFile, "utf8"));
-        const items = data.map((mem: string, i: number) => {
-            const preview = mem.length > 50 ? mem.substring(0, 50) + "..." : mem;
-            return new MemoryItem(preview, i, mem);
+        const data = readMemFile(this.memoryFile);
+        const items = data.map((r, i) => {
+            const preview = r.text.length > 50 ? r.text.substring(0, 50) + "..." : r.text;
+            const tip = `[${r.ts}] ${r.text}` + (r.embedding ? "" : "  (no embedding)");
+            return new MemoryItem(preview, i, tip);
         });
         return Promise.resolve(items.reverse());
     }
 
     deleteItem(index: number) {
-        const data = JSON.parse(fs.readFileSync(this.memoryFile, "utf8"));
+        const data = readMemFile(this.memoryFile);
         data.splice(data.length - 1 - index, 1);
-        fs.writeFileSync(this.memoryFile, JSON.stringify(data, null, 2));
+        writeMemFile(this.memoryFile, data);
         this.refresh();
     }
 }
@@ -175,20 +225,42 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand("memory-lane.enableAutoCapture", () => enableAutoCapture(hooksDir)),
         vscode.commands.registerCommand("memory-lane.disableAutoCapture", () => disableAutoCapture(hooksDir)),
         vscode.commands.registerCommand("memory-lane.enableSmartRecall", () => enableSmartRecall()),
-        vscode.commands.registerCommand("memory-lane.disableSmartRecall", () => disableSmartRecall())
+        vscode.commands.registerCommand("memory-lane.disableSmartRecall", () => disableSmartRecall()),
+        vscode.commands.registerCommand("memory-lane.reindex", () => reindexMemories(memoryFile, memoryProvider))
     );
 
     const searchTool = vscode.lm.registerTool<{ query: string }>("lane_search", {
         async invoke(options) {
             const input: any = (options as any).input ?? (options as any).parameters ?? {};
-            const query = String(input.query ?? "").toLowerCase();
-            let data: string[] = [];
-            try { data = JSON.parse(fs.readFileSync(memoryFile, "utf8")); } catch {}
-            const results = query ? data.filter((m) => m.toLowerCase().includes(query)) : data;
+            const query = String(input.query ?? "").trim();
+            const data = readMemFile(memoryFile);
+            if (!query) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        data.length ? data.map(r => `- ${r.text}`).join("\n") : "No memories found."
+                    )
+                ]);
+            }
+            const qEmb = await embed(query);
+            let results: { rec: MemRecord; score: number }[];
+            if (qEmb) {
+                results = data
+                    .filter(r => r.embedding && r.embedding.length)
+                    .map(r => ({ rec: r, score: cosine(qEmb, r.embedding!) }));
+                const ql = query.toLowerCase();
+                const subs = data.filter(r => !r.embedding && r.text.toLowerCase().includes(ql))
+                    .map(r => ({ rec: r, score: 0.5 }));
+                results = results.concat(subs).sort((a, b) => b.score - a.score).filter(x => x.score >= 0.25).slice(0, 8);
+            } else {
+                const ql = query.toLowerCase();
+                results = data.filter(r => r.text.toLowerCase().includes(ql)).map(r => ({ rec: r, score: 1 }));
+            }
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     `Memory Lane results for "${query}":\n` +
-                    (results.length > 0 ? results.map((r: string) => "- " + r).join("\n") : "No memories found.")
+                    (results.length
+                        ? results.map(x => `- (${x.score.toFixed(2)}) ${x.rec.text}`).join("\n")
+                        : "No memories found.")
                 )
             ]);
         },
@@ -200,19 +272,25 @@ export function activate(context: vscode.ExtensionContext) {
     const saveTool = vscode.lm.registerTool<{ content: string }>("lane_save", {
         async invoke(options) {
             const input: any = (options as any).input ?? (options as any).parameters ?? {};
-            const content = String(input.content ?? "");
+            const content = String(input.content ?? "").trim();
             if (!content) {
                 return new vscode.LanguageModelToolResult([
                     new vscode.LanguageModelTextPart("Error: no content provided.")
                 ]);
             }
-            let data: string[] = [];
-            try { data = JSON.parse(fs.readFileSync(memoryFile, "utf8")); } catch {}
-            data.push(`[${new Date().toISOString()}] ${content}`);
-            fs.writeFileSync(memoryFile, JSON.stringify(data, null, 2));
+            const data = readMemFile(memoryFile);
+            const dup = data.find(r => r.text.toLowerCase() === content.toLowerCase());
+            if (dup) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(`Already in Memory Lane.`)
+                ]);
+            }
+            const embedding = await embed(content);
+            data.push({ text: content, ts: new Date().toISOString(), embedding });
+            writeMemFile(memoryFile, data);
             memoryProvider.refresh();
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(`Saved to Memory Lane: ${content}`)
+                new vscode.LanguageModelTextPart(`Saved to Memory Lane${embedding ? " (semantic indexed)" : ""}: ${content}`)
             ]);
         },
         async prepareInvocation() {
@@ -221,6 +299,31 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(searchTool, saveTool);
+}
+
+async function reindexMemories(memoryFile: string, provider: { refresh(): void }) {
+    const data = readMemFile(memoryFile);
+    const todo = data.filter(r => !r.embedding || r.embedding.length === 0);
+    if (todo.length === 0) {
+        vscode.window.showInformationMessage("Memory Lane: all memories already indexed.");
+        return;
+    }
+    await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: `Memory Lane: indexing ${todo.length} memories...`,
+        cancellable: false
+    }, async (progress) => {
+        let done = 0;
+        for (const r of todo) {
+            const emb = await embed(r.text);
+            if (emb) r.embedding = emb;
+            done++;
+            progress.report({ message: `${done}/${todo.length}`, increment: 100 / todo.length });
+        }
+        writeMemFile(memoryFile, data);
+        provider.refresh();
+    });
+    vscode.window.showInformationMessage("Memory Lane: reindex complete.");
 }
 
 export function deactivate() {}
