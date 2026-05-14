@@ -1,10 +1,10 @@
 {
-  "name": "copilot-mem-ext",
+  "name": "memory-lane",
   "publisher": "akashdwivedi",
-  "repository": {"type": "git", "url": "https://github.com/akashdwivedi/copilot-mem-ext.git"},
-  "displayName": "Copilot Mem",
-  "description": "Persistent memory for GitHub Copilot inside VS Code",
-  "version": "1.2.2",
+  "repository": {"type": "git", "url": "https://github.com/AkashAi7/copilot-mem-approaches.git"},
+  "displayName": "Memory Lane",
+  "description": "Persistent memory lane for GitHub Copilot chat.",
+  "version": "1.3.0",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -17,67 +17,67 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "copilot-mem-sidebar",
-          "title": "Copilot Mem",
+          "id": "memory-lane-sidebar",
+          "title": "Memory Lane",
           "icon": "$(database)"
         }
       ]
     },
     "views": {
-      "copilot-mem-sidebar": [
+      "memory-lane-sidebar": [
         {
-          "id": "copilot-mem-explorer",
+          "id": "memory-lane-explorer",
           "name": "Stored Memories"
         }
       ]
     },
     "commands": [
       {
-        "command": "copilot-mem.refresh",
+        "command": "memory-lane.refresh",
         "title": "Refresh Memories",
         "icon": "$(refresh)"
       },
       {
-        "command": "copilot-mem.delete",
+        "command": "memory-lane.delete",
         "title": "Delete Memory",
         "icon": "$(trash)"
       },
       {
-        "command": "copilot-mem.enableAutoCapture",
-        "title": "Copilot Mem: Enable Auto-Capture (Hooks)"
+        "command": "memory-lane.enableAutoCapture",
+        "title": "Memory Lane: Enable Auto-Capture (Hooks)"
       },
       {
-        "command": "copilot-mem.disableAutoCapture",
-        "title": "Copilot Mem: Disable Auto-Capture (Hooks)"
+        "command": "memory-lane.disableAutoCapture",
+        "title": "Memory Lane: Disable Auto-Capture (Hooks)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "copilot-mem.refresh",
-          "when": "view == copilot-mem-explorer",
+          "command": "memory-lane.refresh",
+          "when": "view == memory-lane-explorer",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
-          "command": "copilot-mem.delete",
-          "when": "view == copilot-mem-explorer",
+          "command": "memory-lane.delete",
+          "when": "view == memory-lane-explorer",
           "group": "inline"
         }
       ]
     },
     "languageModelTools": [
       {
-        "name": "mem_search",
-        "displayName": "Search Memory",
-        "userDescription": "Search Copilot's persistent memory store.",
+        "name": "lane_search",
+        "displayName": "Search Memory Lane",
+        "userDescription": "Search persistent Memory Lane storage.",
         "canBeReferencedInPrompt": true,
         "tags": ["memory", "context", "history"],
-        "toolReferenceName": "searchMem",
+        "toolReferenceName": "laneSearch",
         "icon": "$(search)",
-        "description": "Search the persistent memory store.",
-        "modelDescription": "Search the persistent memory store for previously saved context, preferences, or facts.",
+        "description": "Search the Memory Lane store.",
+        "modelDescription": "Search the Memory Lane store for previously saved context, preferences, or facts.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -87,15 +87,15 @@
         }
       },
       {
-        "name": "mem_save",
-        "displayName": "Save Memory",
-        "userDescription": "Save context to Copilot's persistent memory.",
+        "name": "lane_save",
+        "displayName": "Save to Memory Lane",
+        "userDescription": "Save context to Memory Lane.",
         "canBeReferencedInPrompt": true,
         "tags": ["memory", "remember"],
-        "toolReferenceName": "saveMem",
+        "toolReferenceName": "laneSave",
         "icon": "$(save)",
-        "description": "Save important context to memory.",
-        "modelDescription": "Persist a fact, preference, or piece of context so it can be recalled in future chat sessions.",
+        "description": "Save important context to Memory Lane.",
+        "modelDescription": "Persist a fact, preference, or piece of context to Memory Lane so it can be recalled in future chat sessions.",
         "inputSchema": {
           "type": "object",
           "properties": {

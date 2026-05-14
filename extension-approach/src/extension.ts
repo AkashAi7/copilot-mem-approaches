@@ -27,21 +27,19 @@ class MemoryProvider implements vscode.TreeDataProvider<MemoryItem> {
         return element;
     }
 
-    getChildren(element?: MemoryItem): Thenable<MemoryItem[]> {
+    getChildren(): Thenable<MemoryItem[]> {
         if (!fs.existsSync(this.memoryFile)) return Promise.resolve([]);
         const data = JSON.parse(fs.readFileSync(this.memoryFile, "utf8"));
-        
         const items = data.map((mem: string, i: number) => {
             const preview = mem.length > 50 ? mem.substring(0, 50) + "..." : mem;
             return new MemoryItem(preview, i, mem);
         });
-        
-        return Promise.resolve(items.reverse()); // Show newest first
+        return Promise.resolve(items.reverse());
     }
 
     deleteItem(index: number) {
         const data = JSON.parse(fs.readFileSync(this.memoryFile, "utf8"));
-        data.splice(index, 1);
+        data.splice(data.length - 1 - index, 1);
         fs.writeFileSync(this.memoryFile, JSON.stringify(data, null, 2));
         this.refresh();
     }
@@ -88,7 +86,6 @@ process.stdin.on('end', () => {
         }
     };
     fs.writeFileSync(settingsFile, JSON.stringify(hookSettings, null, 2));
-    return { settingsFile, captureScript };
 }
 
 async function enableAutoCapture(hooksDir: string) {
@@ -96,7 +93,7 @@ async function enableAutoCapture(hooksDir: string) {
     const existing = config.get<Record<string, boolean>>("chat.hookFilesLocations") || {};
     existing[hooksDir] = true;
     await config.update("chat.hookFilesLocations", existing, vscode.ConfigurationTarget.Global);
-    vscode.window.showInformationMessage("Copilot Mem: Auto-capture enabled. Reload window if hooks don't pick up.");
+    vscode.window.showInformationMessage("Memory Lane: Auto-capture enabled. Reload window to activate hooks.");
 }
 
 async function disableAutoCapture(hooksDir: string) {
@@ -106,68 +103,62 @@ async function disableAutoCapture(hooksDir: string) {
         existing[hooksDir] = false;
         await config.update("chat.hookFilesLocations", existing, vscode.ConfigurationTarget.Global);
     }
-    vscode.window.showInformationMessage("Copilot Mem: Auto-capture disabled.");
+    vscode.window.showInformationMessage("Memory Lane: Auto-capture disabled.");
 }
 
 export function activate(context: vscode.ExtensionContext) {
     const memoryDir = path.join(context.globalStorageUri.fsPath, "memory");
-    if (!fs.existsSync(memoryDir)) {
-        fs.mkdirSync(memoryDir, { recursive: true });
-    }
+    if (!fs.existsSync(memoryDir)) fs.mkdirSync(memoryDir, { recursive: true });
     const memoryFile = path.join(memoryDir, "memories.json");
-    if (!fs.existsSync(memoryFile)) {
-        fs.writeFileSync(memoryFile, JSON.stringify([]));
-    }
+    if (!fs.existsSync(memoryFile)) fs.writeFileSync(memoryFile, JSON.stringify([]));
 
     const hooksDir = path.join(context.globalStorageUri.fsPath, "hooks");
     writeHookFiles(hooksDir, memoryFile);
 
     const memoryProvider = new MemoryProvider(memoryFile);
-    vscode.window.registerTreeDataProvider("copilot-mem-explorer", memoryProvider);
+    vscode.window.registerTreeDataProvider("memory-lane-explorer", memoryProvider);
 
-    // Auto-refresh tree when memory file changes (catches hook-driven writes)
     try {
         fs.watch(memoryFile, { persistent: false }, () => memoryProvider.refresh());
     } catch {}
 
-    context.subscriptions.push(vscode.commands.registerCommand("copilot-mem.refresh", () => memoryProvider.refresh()));
-    context.subscriptions.push(vscode.commands.registerCommand("copilot-mem.delete", (node: MemoryItem) => {
-        memoryProvider.deleteItem(node.index);
-    }));
-    context.subscriptions.push(vscode.commands.registerCommand("copilot-mem.enableAutoCapture", () => enableAutoCapture(hooksDir)));
-    context.subscriptions.push(vscode.commands.registerCommand("copilot-mem.disableAutoCapture", () => disableAutoCapture(hooksDir)));
+    context.subscriptions.push(
+        vscode.commands.registerCommand("memory-lane.refresh", () => memoryProvider.refresh()),
+        vscode.commands.registerCommand("memory-lane.delete", (node: MemoryItem) => memoryProvider.deleteItem(node.index)),
+        vscode.commands.registerCommand("memory-lane.enableAutoCapture", () => enableAutoCapture(hooksDir)),
+        vscode.commands.registerCommand("memory-lane.disableAutoCapture", () => disableAutoCapture(hooksDir))
+    );
 
-    const searchTool = vscode.lm.registerTool("mem_search", {
-        async invoke(options, _token) {
+    const searchTool = vscode.lm.registerTool("lane_search", {
+        async invoke(options) {
             const data = JSON.parse(fs.readFileSync(memoryFile, "utf8"));
-            const query = (options.parameters.query as string).toLowerCase();
+            const query = ((options.parameters as any).query as string).toLowerCase();
             const results = data.filter((m: string) => m.toLowerCase().includes(query));
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(`Search results for "${query}":\n` + (results.length > 0 ? results.join("\n- ") : "No memories found."))
+                new vscode.LanguageModelTextPart(
+                    `Memory Lane results for "${query}":\n` +
+                    (results.length > 0 ? results.map((r: string) => "- " + r).join("\n") : "No memories found.")
+                )
             ]);
         },
-        async prepareInvocation(options, _token) {
-            return {
-                invocationMessage: "Searching persistent memory...",
-            };
+        async prepareInvocation() {
+            return { invocationMessage: "Walking down Memory Lane..." };
         }
     });
 
-    const saveTool = vscode.lm.registerTool("mem_save", {
-        async invoke(options, _token) {
+    const saveTool = vscode.lm.registerTool("lane_save", {
+        async invoke(options) {
             const data = JSON.parse(fs.readFileSync(memoryFile, "utf8"));
-            const content = options.parameters.content as string;
+            const content = (options.parameters as any).content as string;
             data.push(`[${new Date().toISOString()}] ${content}`);
             fs.writeFileSync(memoryFile, JSON.stringify(data, null, 2));
             memoryProvider.refresh();
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(`Successfully saved to memory.`)
+                new vscode.LanguageModelTextPart(`Saved to Memory Lane.`)
             ]);
         },
-        async prepareInvocation(options, _token) {
-            return {
-                invocationMessage: "Saving context to persistent memory...",
-            };
+        async prepareInvocation() {
+            return { invocationMessage: "Saving to Memory Lane..." };
         }
     });
 
