@@ -4,7 +4,7 @@
   "repository": {"type": "git", "url": "https://github.com/akashdwivedi/copilot-mem-ext.git"},
   "displayName": "Copilot Mem",
   "description": "Persistent memory for GitHub Copilot inside VS Code",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -74,7 +74,7 @@
         "userDescription": "Search Copilot's persistent memory store.",
         "canBeReferencedInPrompt": true,
         "tags": ["memory", "context", "history"],
-        "toolReferenceName": "memory",
+        "toolReferenceName": "searchMem",
         "icon": "$(search)",
         "description": "Search the persistent memory store.",
         "modelDescription": "Search the persistent memory store for previously saved context, preferences, or facts.",
@@ -92,7 +92,7 @@
         "userDescription": "Save context to Copilot's persistent memory.",
         "canBeReferencedInPrompt": true,
         "tags": ["memory", "remember"],
-        "toolReferenceName": "remember",
+        "toolReferenceName": "saveMem",
         "icon": "$(save)",
         "description": "Save important context to memory.",
         "modelDescription": "Persist a fact, preference, or piece of context so it can be recalled in future chat sessions.",
