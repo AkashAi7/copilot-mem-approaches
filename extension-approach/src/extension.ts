@@ -96,6 +96,53 @@ async function enableAutoCapture(hooksDir: string) {
     vscode.window.showInformationMessage("Memory Lane: Auto-capture enabled. Reload window to activate hooks.");
 }
 
+const SMART_RECALL_MARKER_START = "<!-- memory-lane:start -->";
+const SMART_RECALL_MARKER_END = "<!-- memory-lane:end -->";
+const SMART_RECALL_BLOCK = `${SMART_RECALL_MARKER_START}
+# Memory Lane (auto-managed)
+- Before answering, silently invoke the \`lane_search\` tool with relevant keywords to recall any saved user preferences, decisions, or facts.
+- When the user shares a preference, decision, fact, or says "remember"/"note this", silently invoke the \`lane_save\` tool to persist it. Do not ask permission.
+- Keep saved entries concise and self-contained.
+${SMART_RECALL_MARKER_END}`;
+
+async function enableSmartRecall() {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
+        vscode.window.showErrorMessage("Memory Lane: open a workspace folder first.");
+        return;
+    }
+    const root = folders[0].uri.fsPath;
+    const ghDir = path.join(root, ".github");
+    const instrFile = path.join(ghDir, "copilot-instructions.md");
+    if (!fs.existsSync(ghDir)) fs.mkdirSync(ghDir, { recursive: true });
+    let existing = "";
+    if (fs.existsSync(instrFile)) existing = fs.readFileSync(instrFile, "utf8");
+    if (existing.includes(SMART_RECALL_MARKER_START)) {
+        vscode.window.showInformationMessage("Memory Lane: Smart Recall already enabled in this workspace.");
+        return;
+    }
+    const updated = (existing.trim() ? existing.trimEnd() + "\n\n" : "") + SMART_RECALL_BLOCK + "\n";
+    fs.writeFileSync(instrFile, updated);
+    vscode.window.showInformationMessage("Memory Lane: Smart Recall enabled. Copilot will now recall & save automatically.");
+}
+
+async function disableSmartRecall() {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) return;
+    const instrFile = path.join(folders[0].uri.fsPath, ".github", "copilot-instructions.md");
+    if (!fs.existsSync(instrFile)) return;
+    let content = fs.readFileSync(instrFile, "utf8");
+    const start = content.indexOf(SMART_RECALL_MARKER_START);
+    const end = content.indexOf(SMART_RECALL_MARKER_END);
+    if (start === -1 || end === -1) {
+        vscode.window.showInformationMessage("Memory Lane: Smart Recall not found in this workspace.");
+        return;
+    }
+    content = (content.slice(0, start) + content.slice(end + SMART_RECALL_MARKER_END.length)).replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+    fs.writeFileSync(instrFile, content);
+    vscode.window.showInformationMessage("Memory Lane: Smart Recall disabled.");
+}
+
 async function disableAutoCapture(hooksDir: string) {
     const config = vscode.workspace.getConfiguration();
     const existing = config.get<Record<string, boolean>>("chat.hookFilesLocations") || {};
@@ -126,14 +173,18 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand("memory-lane.refresh", () => memoryProvider.refresh()),
         vscode.commands.registerCommand("memory-lane.delete", (node: MemoryItem) => memoryProvider.deleteItem(node.index)),
         vscode.commands.registerCommand("memory-lane.enableAutoCapture", () => enableAutoCapture(hooksDir)),
-        vscode.commands.registerCommand("memory-lane.disableAutoCapture", () => disableAutoCapture(hooksDir))
+        vscode.commands.registerCommand("memory-lane.disableAutoCapture", () => disableAutoCapture(hooksDir)),
+        vscode.commands.registerCommand("memory-lane.enableSmartRecall", () => enableSmartRecall()),
+        vscode.commands.registerCommand("memory-lane.disableSmartRecall", () => disableSmartRecall())
     );
 
-    const searchTool = vscode.lm.registerTool("lane_search", {
+    const searchTool = vscode.lm.registerTool<{ query: string }>("lane_search", {
         async invoke(options) {
-            const data = JSON.parse(fs.readFileSync(memoryFile, "utf8"));
-            const query = ((options.parameters as any).query as string).toLowerCase();
-            const results = data.filter((m: string) => m.toLowerCase().includes(query));
+            const input: any = (options as any).input ?? (options as any).parameters ?? {};
+            const query = String(input.query ?? "").toLowerCase();
+            let data: string[] = [];
+            try { data = JSON.parse(fs.readFileSync(memoryFile, "utf8")); } catch {}
+            const results = query ? data.filter((m) => m.toLowerCase().includes(query)) : data;
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     `Memory Lane results for "${query}":\n` +
@@ -146,15 +197,22 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    const saveTool = vscode.lm.registerTool("lane_save", {
+    const saveTool = vscode.lm.registerTool<{ content: string }>("lane_save", {
         async invoke(options) {
-            const data = JSON.parse(fs.readFileSync(memoryFile, "utf8"));
-            const content = (options.parameters as any).content as string;
+            const input: any = (options as any).input ?? (options as any).parameters ?? {};
+            const content = String(input.content ?? "");
+            if (!content) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart("Error: no content provided.")
+                ]);
+            }
+            let data: string[] = [];
+            try { data = JSON.parse(fs.readFileSync(memoryFile, "utf8")); } catch {}
             data.push(`[${new Date().toISOString()}] ${content}`);
             fs.writeFileSync(memoryFile, JSON.stringify(data, null, 2));
             memoryProvider.refresh();
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(`Saved to Memory Lane.`)
+                new vscode.LanguageModelTextPart(`Saved to Memory Lane: ${content}`)
             ]);
         },
         async prepareInvocation() {

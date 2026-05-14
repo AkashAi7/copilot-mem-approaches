@@ -4,7 +4,7 @@
   "repository": {"type": "git", "url": "https://github.com/AkashAi7/copilot-mem-approaches.git"},
   "displayName": "Memory Lane",
   "description": "Persistent memory lane for GitHub Copilot chat.",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -49,6 +49,14 @@
       {
         "command": "memory-lane.disableAutoCapture",
         "title": "Memory Lane: Disable Auto-Capture (Hooks)"
+      },
+      {
+        "command": "memory-lane.enableSmartRecall",
+        "title": "Memory Lane: Enable Smart Recall (auto save/search)"
+      },
+      {
+        "command": "memory-lane.disableSmartRecall",
+        "title": "Memory Lane: Disable Smart Recall"
       }
     ],
     "menus": {
