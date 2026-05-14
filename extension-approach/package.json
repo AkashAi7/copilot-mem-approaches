@@ -4,7 +4,7 @@
   "repository": {"type": "git", "url": "https://github.com/akashdwivedi/copilot-mem-ext.git"},
   "displayName": "Copilot Mem",
   "description": "Persistent memory for GitHub Copilot inside VS Code",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -62,28 +62,36 @@
     "languageModelTools": [
       {
         "name": "copilot_mem_search",
+        "displayName": "Search Memory",
+        "userDescription": "Search Copilot's persistent memory store.",
+        "canBeReferencedInPrompt": true,
         "tags": ["memory", "context", "history"],
         "toolReferenceName": "memory",
+        "icon": "$(search)",
         "description": "Search the persistent memory store.",
-        "modelDescription": "Search the persistent memory store.",
-        "parametersSchema": {
+        "modelDescription": "Search the persistent memory store for previously saved context, preferences, or facts.",
+        "inputSchema": {
           "type": "object",
           "properties": {
-            "query": { "type": "string" }
+            "query": { "type": "string", "description": "Keywords or phrase to search for." }
           },
           "required": ["query"]
         }
       },
       {
         "name": "copilot_mem_save",
+        "displayName": "Save Memory",
+        "userDescription": "Save context to Copilot's persistent memory.",
+        "canBeReferencedInPrompt": true,
         "tags": ["memory", "remember"],
         "toolReferenceName": "remember",
+        "icon": "$(save)",
         "description": "Save important context to memory.",
-        "modelDescription": "Save important context.",
-        "parametersSchema": {
+        "modelDescription": "Persist a fact, preference, or piece of context so it can be recalled in future chat sessions.",
+        "inputSchema": {
           "type": "object",
           "properties": {
-            "content": { "type": "string" }
+            "content": { "type": "string", "description": "The information to remember." }
           },
           "required": ["content"]
         }
